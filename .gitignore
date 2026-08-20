@@ -1,0 +1,6 @@
+# Local Supabase frontend configuration
+js/config.js
+
+# OS/editor files
+.DS_Store
+.vscode/
