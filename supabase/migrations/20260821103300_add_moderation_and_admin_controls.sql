@@ -46,6 +46,10 @@ $$;
 revoke execute on function public.can_create_comment() from public, anon;
 grant execute on function public.can_create_comment() to authenticated;
 
+drop policy if exists "users update own profile" on public.profiles;
+drop policy if exists "users insert own profile" on public.profiles;
+revoke insert, update, delete on public.profiles from authenticated, anon;
+
 drop policy if exists "authenticated users create own posts" on public.posts;
 create policy "authenticated users create own posts"
 on public.posts for insert to authenticated
