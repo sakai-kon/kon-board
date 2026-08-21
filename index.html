@@ -26,5 +26,5 @@
   <template id="thread-template"><article id="thread-detail"></article></template>
   <template id="profile-template"><section class="form-page profile-page"><p class="eyebrow">PROFILE</p><h1>プロフィール設定</h1><p>表示名を変更すると、過去の投稿・コメントも新しい名前で表示されます。</p><form id="profile-form"><label>表示名<input id="display-name" name="display_name" maxlength="32" minlength="1" required autocomplete="nickname" /></label><p id="profile-message"></p><button class="button button-primary" type="submit">表示名を保存</button></form></section></template>
   <template id="admin-template"><section class="admin-page"><div class="section-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>管理画面</h1></div></div><div id="admin-summary" class="admin-summary"></div><div id="admin-notice"></div><div class="admin-card"><h2>ユーザー管理</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ユーザー</th><th>権限</th><th>状態</th><th>最終ログイン</th><th>操作</th></tr></thead><tbody id="user-table-body"></tbody></table></div></div></section></template>
-  <script src="js/config.js"></script><script src="js/theme.js"></script><script type="module" src="js/app.js"></script>
+  <script src="js/config.js"></script><script src="js/theme.js"></script><script type="module" src="js/app.js"></script><script type="module" src="js/auth.js"></script>
 </body></html>
