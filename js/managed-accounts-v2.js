@@ -12,6 +12,7 @@ const invoke = async body => {
   if (!supabase) throw new Error('Supabaseの設定がまだ完了していません。');
   const { data, error } = await supabase.functions.invoke('admin-moderation', { body });
   if (error) throw error;
+  if (data?.ok === false) throw new Error(data.error || '処理に失敗しました。');
   if (data?.error) throw new Error(data.error);
   return data;
 };
@@ -22,6 +23,10 @@ const isAdmin = async () => {
   const { data } = await supabase.from('profiles').select('role,account_status').eq('id', user.id).maybeSingle();
   return data?.role === 'admin' && data?.account_status === 'active';
 };
+
+function safeReset(form) {
+  if (form && typeof form.reset === 'function' && form.isConnected) form.reset();
+}
 
 function addManagedLoginLink() {
   const host = app?.querySelector('.auth-actions');
@@ -48,30 +53,37 @@ function renderManagedLogin() {
     <div id="managed-login-message" class="auth-message" aria-live="polite"></div>
     <a href="#/login" class="button button-secondary">通常のログインへ</a>
   </div></section>`;
-  app.querySelector('#managed-login-form').onsubmit = async e => {
+  const loginForm = app.querySelector('#managed-login-form');
+  if (!loginForm) return;
+  loginForm.onsubmit = async e => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    const form = new FormData(formElement);
     const managedId = String(form.get('managedId') || '').trim().toLowerCase();
     const password = String(form.get('password') || '');
-    const button = e.currentTarget.querySelector('button[type="submit"]');
+    const button = formElement.querySelector('button[type="submit"]');
     const message = app.querySelector('#managed-login-message');
+    if (!message || !button) return;
     if (!validId(managedId)) { message.className='auth-message error'; message.textContent='ユーザーIDは英数字・_・-の3〜32文字です。'; return; }
     button.disabled = true;
-    const { data, error } = await supabase.auth.signInWithPassword({ email: internalEmail(managedId), password });
-    button.disabled = false;
-    if (error || !data.user) {
-      message.className = 'auth-message error';
-      message.textContent = 'ログインに失敗しました。ユーザーIDとパスワードを確認してください。';
-      return;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: internalEmail(managedId), password });
+      if (error || !data.user) {
+        message.className = 'auth-message error';
+        message.textContent = 'ログインに失敗しました。ユーザーIDとパスワードを確認してください。';
+        return;
+      }
+      const isManaged = data.user.app_metadata?.kotoha_managed_account === true && data.user.app_metadata?.managed_id === managedId;
+      if (!isManaged) {
+        await supabase.auth.signOut();
+        message.className = 'auth-message error';
+        message.textContent = 'このページは管理者発行アカウント専用です。';
+        return;
+      }
+      location.hash = '/home';
+    } finally {
+      if (button.isConnected) button.disabled = false;
     }
-    const isManaged = data.user.app_metadata?.kotoha_managed_account === true && data.user.app_metadata?.managed_id === managedId;
-    if (!isManaged) {
-      await supabase.auth.signOut();
-      message.className = 'auth-message error';
-      message.textContent = 'このページは管理者発行アカウント専用です。';
-      return;
-    }
-    location.hash = '/home';
   };
 }
 
@@ -93,8 +105,11 @@ async function renderManagedAccounts() {
   </section>`;
   const list = app.querySelector('#managed-account-list');
   const message = app.querySelector('#managed-create-message');
+  const createForm = app.querySelector('#managed-create-form');
+  if (!list || !message || !createForm) return;
   const refresh = async () => {
-    const { users } = await invoke({ action: 'list_managed_accounts' });
+    const { users = [] } = await invoke({ action: 'list_managed_accounts' });
+    if (!list.isConnected) return;
     list.innerHTML = users.length ? users.map(u => `<div class="managed-account-row">
       <div><strong>${escapeHtml(u.display_name)}</strong><div class="meta">ID: ${escapeHtml(u.managed_id || '')} ・ 権限: 一般</div></div>
       <div class="managed-account-meta"><span class="muted">${new Intl.DateTimeFormat('ja-JP',{dateStyle:'medium'}).format(new Date(u.created_at))}</span><button class="button button-danger button-small" data-delete-id="${escapeHtml(u.id)}">削除</button></div>
@@ -103,30 +118,35 @@ async function renderManagedAccounts() {
       if (!confirm('この発行アカウントを削除しますか？')) return;
       btn.disabled = true;
       try { await invoke({ action: 'delete_managed_account', targetUserId: btn.dataset.deleteId }); await refresh(); }
-      catch (e) { alert(e.message); btn.disabled = false; }
+      catch (e) { alert(e?.message || '削除に失敗しました。'); if (btn.isConnected) btn.disabled = false; }
     });
   };
-  app.querySelector('#managed-create-form').onsubmit = async e => {
+  createForm.onsubmit = async e => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    if (!formElement || typeof formElement.reset !== 'function') return;
+    const form = new FormData(formElement);
     const managedId = String(form.get('managedId') || '').trim().toLowerCase();
     const displayName = String(form.get('displayName') || '').trim();
     const password = String(form.get('password') || '');
-    const button = e.currentTarget.querySelector('button[type="submit"]');
+    const button = formElement.querySelector('button[type="submit"]');
     message.textContent = '';
     if (!validId(managedId)) { message.className='auth-message error'; message.textContent='ユーザーIDは英数字・_・-の3〜32文字で設定してください。'; return; }
     if (password.length < 8) { message.className='auth-message error'; message.textContent='パスワードは8文字以上にしてください。'; return; }
+    if (!button) return;
     button.disabled = true;
     try {
       const result = await invoke({ action: 'create_managed_account', managedId, displayName, password });
       message.className = 'auth-message success';
-      message.textContent = `${result.user.managed_id} のアカウントを発行しました。専用ログインページから利用できます。`;
-      e.currentTarget.reset();
+      message.textContent = `${result?.user?.managed_id || managedId} のアカウントを発行しました。専用ログインページから利用できます。`;
+      safeReset(formElement);
       await refresh();
     } catch (error) {
       message.className = 'auth-message error';
-      message.textContent = error.message;
-    } finally { button.disabled = false; }
+      message.textContent = error?.message || 'アカウントの発行に失敗しました。';
+    } finally {
+      if (button.isConnected) button.disabled = false;
+    }
   };
   await refresh();
 }
