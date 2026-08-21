@@ -6,6 +6,16 @@ const supabase = config.supabaseUrl && config.supabaseAnonKey
   : null;
 const app = document.querySelector('#app');
 
+function ensureStyles() {
+  if (document.querySelector('link[data-admin-accounts-style]')) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'css/admin-accounts.css';
+  link.dataset.adminAccountsStyle = 'true';
+  document.head.appendChild(link);
+}
+ensureStyles();
+
 const escapeHtml = (v='') => String(v).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
 const invoke = async body => {
   if (!supabase) throw new Error('Supabaseの設定がまだ完了していません。');
