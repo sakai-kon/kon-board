@@ -14,6 +14,6 @@
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, true);
 
-  // admin-accounts.js is loaded here so existing index.html files need no extra script tag.
-  import('./admin-accounts.js').catch(error => console.error('Failed to load managed account module:', error));
+  // Load the current ID-based managed-account flow.
+  import('./admin-accounts-v2.js').catch(error => console.error('Failed to load managed account module:', error));
 })();
