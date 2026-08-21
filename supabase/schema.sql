@@ -1,8 +1,9 @@
--- KON BOARD initial schema
+-- KOTOHA BOARD initial schema
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null check (char_length(display_name) between 1 and 40),
   avatar_url text,
+  display_name_custom boolean not null default false,
   created_at timestamptz not null default now()
 );
 create table if not exists public.posts (
@@ -60,12 +61,29 @@ create policy "users manage own likes" on public.likes for all using (auth.uid()
 create policy "users create reports" on public.reports for insert to authenticated with check (auth.uid() = reporter_id);
 create policy "users read own reports" on public.reports for select using (auth.uid() = reporter_id);
 
--- Create a profile automatically for OAuth users.
+-- Create a profile automatically for new OAuth/email users.
+-- Existing profiles are never overwritten by a later OAuth login.
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
-  insert into public.profiles (id, display_name, avatar_url)
-  values (new.id, coalesce(new.raw_user_meta_data->>'user_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), '名無しさん'), new.raw_user_meta_data->>'avatar_url')
+  insert into public.profiles (id, display_name, avatar_url, display_name_custom)
+  values (
+    new.id,
+    coalesce(
+      nullif(new.raw_user_meta_data->>'user_name', ''),
+      nullif(new.raw_user_meta_data->>'preferred_username', ''),
+      nullif(new.raw_user_meta_data->>'full_name', ''),
+      nullif(new.raw_user_meta_data->>'name', ''),
+      split_part(coalesce(new.email, 'user'), '@', 1),
+      '名無しさん'
+    ),
+    nullif(new.raw_user_meta_data->>'avatar_url', ''),
+    false
+  )
   on conflict (id) do nothing;
   return new;
 end;
