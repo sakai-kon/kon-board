@@ -1,107 +1,130 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const corsHeaders = {
+const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: corsHeaders });
+const out = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: cors });
+const normalizeId = (value: string) => value.trim().toLowerCase();
+const syntheticEmail = (id: string) => `${id}@managed.kotohaboard.local`;
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return out(405, { error: "Method not allowed" });
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return json(401, { error: "Missing Authorization header" });
+  const auth = req.headers.get("Authorization");
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!auth || !url || !anonKey || !serviceKey) return out(500, { error: "Server configuration error" });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const publishableKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
-  if (!supabaseUrl || !publishableKey || !serviceKey) return json(500, { error: "Server configuration error" });
+  const client = createClient(url, anonKey, { global: { headers: { Authorization: auth } } });
+  const adminClient = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: { user }, error: userError } = await client.auth.getUser();
+  if (userError || !user) return out(401, { error: "Not authenticated" });
 
-  const userClient = createClient(supabaseUrl, publishableKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error: userError } = await userClient.auth.getUser();
-  if (userError || !user) return json(401, { error: "Not authenticated" });
-
-  const adminClient = createClient(supabaseUrl, serviceKey);
-  const { data: actor, error: actorError } = await adminClient
-    .from("profiles")
-    .select("id, role, account_status")
-    .eq("id", user.id)
-    .single();
-
-  if (actorError || actor?.role !== "admin" || actor.account_status !== "active") {
-    return json(403, { error: "Admin access required" });
+  const { data: callerProfile, error: callerError } = await client.from("profiles")
+    .select("role, account_status").eq("id", user.id).maybeSingle();
+  if (callerError || callerProfile?.role !== "admin" || callerProfile?.account_status !== "active") {
+    return out(403, { error: "Admin access required" });
   }
 
-  let payload: { action?: string; targetUserId?: string; value?: string | number | boolean };
-  try { payload = await req.json(); } catch { return json(400, { error: "Invalid JSON" }); }
+  let payload: any;
+  try { payload = await req.json(); } catch { return out(400, { error: "Invalid JSON" }); }
+  const action = String(payload.action ?? "");
 
-  const targetUserId = String(payload.targetUserId ?? "");
-  if (payload.action !== "list_users" && !targetUserId) return json(400, { error: "targetUserId is required" });
-  if (targetUserId === user.id && ["set_status", "set_role"].includes(payload.action ?? "")) {
-    return json(400, { error: "You cannot change your own admin account this way" });
-  }
-
-  switch (payload.action) {
-    case "list_users": {
-      const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      if (error) return json(400, { error: error.message });
-      const ids = data.users.map((u) => u.id);
-      const { data: profiles, error: profileError } = await adminClient
-        .from("profiles")
-        .select("id, display_name, avatar_url, role, account_status, created_at")
-        .in("id", ids);
-      if (profileError) return json(400, { error: profileError.message });
-      const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-      return json(200, {
-        users: data.users.map((u) => ({
-          id: u.id,
-          email: u.email ?? "",
-          created_at: u.created_at,
-          last_sign_in_at: u.last_sign_in_at,
-          banned_until: u.banned_until,
-          ...(byId.get(u.id) ?? { display_name: "名無しさん", avatar_url: null, role: "user", account_status: "active" }),
-        })),
-      });
+  try {
+    if (action === "list_users") {
+      const { data, error } = await client.rpc("admin_list_users");
+      if (error) throw error;
+      return out(200, { users: data ?? [] });
     }
-    case "set_role": {
-      const role = payload.value === "admin" ? "admin" : "user";
-      const { error } = await adminClient.from("profiles").update({ role }).eq("id", targetUserId);
-      if (error) return json(400, { error: error.message });
-      return json(200, { ok: true, role });
+    if (action === "set_role") {
+      const { error } = await client.rpc("admin_set_role", { target_id: String(payload.targetUserId), new_role: String(payload.value) });
+      if (error) throw error;
+      return out(200, { ok: true });
     }
-    case "set_status": {
-      const allowed = ["active", "comment_restricted", "post_restricted", "banned"];
-      const status = String(payload.value ?? "");
-      if (!allowed.includes(status)) return json(400, { error: "Invalid account status" });
-      const { error } = await adminClient.from("profiles").update({ account_status: status }).eq("id", targetUserId);
-      if (error) return json(400, { error: error.message });
-      const { error: authError } = await adminClient.auth.admin.updateUserById(targetUserId, {
-        ban_duration: status === "banned" ? "876000h" : "none",
-      });
-      if (authError) return json(400, { error: authError.message });
-      return json(200, { ok: true, account_status: status });
+    if (action === "set_status") {
+      const { error } = await client.rpc("admin_set_status", { target_id: String(payload.targetUserId), new_status: String(payload.value) });
+      if (error) throw error;
+      return out(200, { ok: true });
     }
-    case "delete_post": {
+    if (action === "delete_post") {
       const postId = String(payload.value ?? "");
+      if (!postId) return out(400, { error: "Post ID is required" });
       const { error } = await adminClient.from("posts").delete().eq("id", postId);
-      if (error) return json(400, { error: error.message });
-      return json(200, { ok: true });
+      if (error) throw error;
+      return out(200, { ok: true });
     }
-    case "delete_comment": {
+    if (action === "delete_comment") {
       const commentId = String(payload.value ?? "");
+      if (!commentId) return out(400, { error: "Comment ID is required" });
       const { error } = await adminClient.from("comments").delete().eq("id", commentId);
-      if (error) return json(400, { error: error.message });
-      return json(200, { ok: true });
+      if (error) throw error;
+      return out(200, { ok: true });
     }
-    default:
-      return json(400, { error: "Unknown action" });
+    if (action === "list_managed_accounts") {
+      const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (error) throw error;
+      const users = (data.users ?? []).filter((u: any) => u.app_metadata?.kotoha_managed_account === true);
+      return out(200, { users: users.map((u: any) => ({
+        id: u.id,
+        managed_id: u.app_metadata?.managed_id,
+        display_name: u.user_metadata?.display_name ?? "",
+        created_at: u.created_at,
+        last_sign_in_at: u.last_sign_in_at,
+        role: "user",
+      })) });
+    }
+    if (action === "create_managed_account") {
+      const managedId = normalizeId(String(payload.managedId ?? ""));
+      const password = String(payload.password ?? "");
+      const displayName = String(payload.displayName ?? "").trim();
+      if (!/^[a-z0-9_-]{3,32}$/.test(managedId)) return out(400, { error: "ユーザーIDは英数字・_・-の3〜32文字で設定してください。" });
+      if (password.length < 8) return out(400, { error: "パスワードは8文字以上にしてください。" });
+      if (displayName.length < 1 || displayName.length > 32) return out(400, { error: "表示名は1〜32文字で入力してください。" });
+
+      const { data: existing, error: existingError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (existingError) throw existingError;
+      const duplicate = (existing.users ?? []).some((u: any) => u.app_metadata?.kotoha_managed_account === true && u.app_metadata?.managed_id === managedId);
+      if (duplicate) return out(409, { error: "そのユーザーIDはすでに使用されています。" });
+
+      const { data, error } = await adminClient.auth.admin.createUser({
+        email: syntheticEmail(managedId),
+        password,
+        email_confirm: true,
+        user_metadata: { display_name: displayName, created_by_admin: true, managed_id: managedId },
+        app_metadata: { kotoha_managed_account: true, managed_id: managedId, created_by_admin: user.id },
+      });
+      if (error || !data.user) throw error ?? new Error("Account creation failed");
+
+      const { error: profileError } = await adminClient.rpc("admin_insert_managed_profile", {
+        p_user_id: data.user.id,
+        p_display_name: displayName,
+      });
+      if (profileError) {
+        await adminClient.auth.admin.deleteUser(data.user.id);
+        throw profileError;
+      }
+      return out(200, { ok: true, user: { id: data.user.id, managed_id: managedId, display_name: displayName, role: "user" } });
+    }
+    if (action === "delete_managed_account") {
+      const targetId = String(payload.targetUserId ?? "");
+      if (!targetId) return out(400, { error: "対象アカウントが指定されていません。" });
+      if (targetId === user.id) return out(400, { error: "自分自身の管理者アカウントは削除できません。" });
+      const { data: targetData, error: targetError } = await adminClient.auth.admin.getUserById(targetId);
+      if (targetError || !targetData.user) throw targetError ?? new Error("User not found");
+      if (targetData.user.app_metadata?.kotoha_managed_account !== true) return out(400, { error: "管理者が発行したアカウントのみ削除できます。" });
+      const { error } = await adminClient.auth.admin.deleteUser(targetId);
+      if (error) throw error;
+      return out(200, { ok: true });
+    }
+    return out(400, { error: "Unknown action" });
+  } catch (error) {
+    return out(400, { error: error instanceof Error ? error.message : "Admin operation failed" });
   }
 });
