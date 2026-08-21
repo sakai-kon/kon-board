@@ -14,6 +14,5 @@
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, true);
 
-  // Load the current ID-based managed-account flow.
-  import('./admin-accounts-v2.js').catch(error => console.error('Failed to load managed account module:', error));
+  import('./managed-accounts-v2.js').catch(error => console.error('Failed to load managed account module:', error));
 })();
