@@ -106,7 +106,10 @@ Deno.serve(async (req) => {
         p_user_id: data.user.id,
         p_display_name: displayName,
       });
-      if (profileError) throw profileError;
+      if (profileError) {
+        await adminClient.auth.admin.deleteUser(data.user.id);
+        throw profileError;
+      }
       return out(200, { ok: true, user: { id: data.user.id, managed_id: managedId, display_name: displayName, role: "user" } });
     }
     if (action === "delete_managed_account") {
