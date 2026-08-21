@@ -13,6 +13,7 @@
     <nav>
       <a href="#/home">ホーム</a>
       <a href="#/new">新規投稿</a>
+      <a id="profile-link" class="hidden" href="#/profile">プロフィール</a>
       <a id="admin-link" class="admin-link hidden" href="#/admin">管理</a>
     </nav>
     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="テーマを切り替える" title="テーマを切り替える">🌙</button>
@@ -20,20 +21,10 @@
     <button id="login-button" class="button button-primary">ログイン</button>
   </header>
   <main id="app" class="container"></main>
-  <template id="home-template">
-    <section class="hero"><p class="eyebrow">COMMUNITY</p><h1>気軽に話そう。</h1><p>ゲーム、プログラミング、雑談など、好きな話題でつながる掲示板。</p></section>
-    <section class="toolbar"><input id="search-input" placeholder="投稿を検索" /><select id="category-filter"><option value="all">すべてのカテゴリ</option><option value="雑談">雑談</option><option value="ゲーム">ゲーム</option><option value="プログラミング">プログラミング</option><option value="質問">質問</option></select></section>
-    <section><div class="section-heading"><h2>最新のスレッド</h2><button id="new-thread" class="button button-primary">＋ 投稿する</button></div><div id="thread-list" class="thread-list"></div></section>
-  </template>
-  <template id="new-template">
-    <section class="form-page"><p class="eyebrow">NEW THREAD</p><h1>新しい投稿</h1><div id="new-notice"></div><form id="thread-form"><label>タイトル<input name="title" maxlength="100" required placeholder="話題を入力" /></label><label>カテゴリ<select name="category"><option>雑談</option><option>ゲーム</option><option>プログラミング</option><option>質問</option></select></label><label>本文<textarea name="content" rows="10" maxlength="5000" required placeholder="内容を入力"></textarea></label><button class="button button-primary" type="submit">投稿する</button></form></section>
-  </template>
+  <template id="home-template"><section class="hero"><p class="eyebrow">COMMUNITY</p><h1>気軽に話そう。</h1><p>ゲーム、プログラミング、雑談など、好きな話題でつながる掲示板。</p></section><section class="toolbar"><input id="search-input" placeholder="投稿を検索" /><select id="category-filter"><option value="all">すべてのカテゴリ</option><option value="雑談">雑談</option><option value="ゲーム">ゲーム</option><option value="プログラミング">プログラミング</option><option value="質問">質問</option></select></section><section><div class="section-heading"><h2>最新のスレッド</h2><button id="new-thread" class="button button-primary">＋ 投稿する</button></div><div id="thread-list" class="thread-list"></div></section></template>
+  <template id="new-template"><section class="form-page"><p class="eyebrow">NEW THREAD</p><h1>新しい投稿</h1><div id="new-notice"></div><form id="thread-form"><label>タイトル<input name="title" maxlength="100" required placeholder="話題を入力" /></label><label>カテゴリ<select name="category"><option>雑談</option><option>ゲーム</option><option>プログラミング</option><option>質問</option></select></label><label>本文<textarea name="content" rows="10" maxlength="5000" required placeholder="内容を入力"></textarea></label><button class="button button-primary" type="submit">投稿する</button></form></section></template>
   <template id="thread-template"><article id="thread-detail"></article></template>
-  <template id="admin-template">
-    <section class="admin-page"><div class="section-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>管理画面</h1></div></div><div id="admin-summary" class="admin-summary"></div><div id="admin-notice"></div><div class="admin-card"><h2>ユーザー管理</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ユーザー</th><th>権限</th><th>状態</th><th>最終ログイン</th><th>操作</th></tr></thead><tbody id="user-table-body"></tbody></table></div></div></section>
-  </template>
-  <script src="js/config.js"></script>
-  <script src="js/theme.js"></script>
-  <script type="module" src="js/app.js"></script>
-</body>
-</html>
+  <template id="profile-template"><section class="form-page profile-page"><p class="eyebrow">PROFILE</p><h1>プロフィール設定</h1><p>表示名を変更すると、過去の投稿・コメントも新しい名前で表示されます。</p><form id="profile-form"><label>表示名<input id="display-name" name="display_name" maxlength="32" minlength="1" required autocomplete="nickname" /></label><p id="profile-message"></p><button class="button button-primary" type="submit">表示名を保存</button></form></section></template>
+  <template id="admin-template"><section class="admin-page"><div class="section-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>管理画面</h1></div></div><div id="admin-summary" class="admin-summary"></div><div id="admin-notice"></div><div class="admin-card"><h2>ユーザー管理</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ユーザー</th><th>権限</th><th>状態</th><th>最終ログイン</th><th>操作</th></tr></thead><tbody id="user-table-body"></tbody></table></div></div></section></template>
+  <script src="js/config.js"></script><script src="js/theme.js"></script><script type="module" src="js/app.js"></script>
+</body></html>
