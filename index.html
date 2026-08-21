@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="KON BOARD - 気軽に話せるコミュニティ掲示板" />
-  <title>KON BOARD</title>
+  <meta name="description" content="Kotoha Board - 気軽に話せるコミュニティ掲示板" />
+  <title>Kotoha Board</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/auth.css" />
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="#/home">KON <span>BOARD</span></a>
+    <a class="brand" href="#/home">Kotoha <span>Board</span></a>
     <nav>
       <a href="#/home">ホーム</a>
       <a href="#/new">新規投稿</a>
@@ -19,7 +19,7 @@
     </nav>
     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="テーマを切り替える" title="テーマを切り替える">🌙</button>
     <div id="header-profile" class="header-profile hidden" aria-label="プロフィールアイコン"></div>
-    <button id="login-button" class="button button-primary">ログイン</button>
+    <button id="login-button" class="button button-primary">ログイン/新規登録</button>
   </header>
   <main id="app" class="container"></main>
   <template id="home-template"><section class="hero"><p class="eyebrow">COMMUNITY</p><h1>気軽に話そう。</h1><p>ゲーム、プログラミング、雑談など、好きな話題でつながる掲示板。</p></section><section class="toolbar"><input id="search-input" placeholder="投稿を検索" /><select id="category-filter"><option value="all">すべてのカテゴリ</option><option value="雑談">雑談</option><option value="ゲーム">ゲーム</option><option value="プログラミング">プログラミング</option><option value="質問">質問</option></select></section><section><div class="section-heading"><h2>最新のスレッド</h2><button id="new-thread" class="button button-primary">＋ 投稿する</button></div><div id="thread-list" class="thread-list"></div></section></template>
