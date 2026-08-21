@@ -53,6 +53,20 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return out(200, { ok: true });
     }
+    if (action === "delete_post") {
+      const postId = String(payload.value ?? "");
+      if (!postId) return out(400, { error: "Post ID is required" });
+      const { error } = await adminClient.from("posts").delete().eq("id", postId);
+      if (error) throw error;
+      return out(200, { ok: true });
+    }
+    if (action === "delete_comment") {
+      const commentId = String(payload.value ?? "");
+      if (!commentId) return out(400, { error: "Comment ID is required" });
+      const { error } = await adminClient.from("comments").delete().eq("id", commentId);
+      if (error) throw error;
+      return out(200, { ok: true });
+    }
     if (action === "list_managed_accounts") {
       const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
       if (error) throw error;
