@@ -22,6 +22,17 @@ const isAdmin = async () => {
   return data?.role === 'admin' && data?.account_status === 'active';
 };
 
+function addManagedLoginLink() {
+  const host = app?.querySelector('.auth-actions');
+  if (!host || host.querySelector('#managed-login-link')) return;
+  const link = document.createElement('a');
+  link.id = 'managed-login-link';
+  link.className = 'managed-login-link';
+  link.href = '#/managed-login';
+  link.textContent = '管理者発行アカウント専用ログインはこちら';
+  host.appendChild(link);
+}
+
 function renderManagedLogin() {
   if (!app) return;
   app.innerHTML = `<section class="managed-login-page"><div class="managed-login-card">
@@ -126,6 +137,13 @@ function route() {
   if (path === '/managed-login') return renderManagedLogin();
   if (path === '/admin/accounts') return renderManagedAccounts();
   if (path === '/admin') { isAdmin().then(ok => { if (ok) addAdminLink(); }); }
+  if (path === '/login' || path === '/auth') addManagedLoginLink();
 }
+
+const observer = new MutationObserver(() => {
+  const path = location.hash.slice(1).split('?')[0] || '/home';
+  if (path === '/login' || path === '/auth') addManagedLoginLink();
+});
+observer.observe(document.documentElement, { childList: true, subtree: true });
 window.addEventListener('hashchange', route);
 route();
