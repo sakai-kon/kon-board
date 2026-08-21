@@ -41,16 +41,10 @@ Deno.serve(async (req: Request) => {
   }
 
   let payload: { action?: string; targetUserId?: string; value?: string | number | boolean };
-  try {
-    payload = await req.json();
-  } catch {
-    return json(400, { error: "Invalid JSON" });
-  }
+  try { payload = await req.json(); } catch { return json(400, { error: "Invalid JSON" }); }
 
   const targetUserId = String(payload.targetUserId ?? "");
-  if (payload.action !== "list_users" && !targetUserId) {
-    return json(400, { error: "targetUserId is required" });
-  }
+  if (payload.action !== "list_users" && !targetUserId) return json(400, { error: "targetUserId is required" });
   if (targetUserId === user.id && ["set_status", "set_role"].includes(payload.action ?? "")) {
     return json(400, { error: "You cannot change your own admin account this way" });
   }
@@ -62,7 +56,7 @@ Deno.serve(async (req: Request) => {
       const ids = data.users.map((u) => u.id);
       const { data: profiles, error: profileError } = await adminClient
         .from("profiles")
-        .select("id, display_name, role, account_status, created_at")
+        .select("id, display_name, avatar_url, role, account_status, created_at")
         .in("id", ids);
       if (profileError) return json(400, { error: profileError.message });
       const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
@@ -73,7 +67,7 @@ Deno.serve(async (req: Request) => {
           created_at: u.created_at,
           last_sign_in_at: u.last_sign_in_at,
           banned_until: u.banned_until,
-          ...(byId.get(u.id) ?? { display_name: "名無しさん", role: "user", account_status: "active" }),
+          ...(byId.get(u.id) ?? { display_name: "名無しさん", avatar_url: null, role: "user", account_status: "active" }),
         })),
       });
     }
