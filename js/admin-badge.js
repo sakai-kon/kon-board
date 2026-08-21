@@ -21,28 +21,29 @@ if (config.supabaseUrl && config.supabaseAnonKey) {
     const span = document.createElement('span');
     span.className = 'admin-owner-badge';
     span.title = 'Kotoha Board 管理者';
-    span.innerHTML = '<span class="admin-crown" aria-hidden="true">♛</span><span>ADMIN</span>';
+    span.textContent = 'ADMIN';
     return span;
+  }
+
+  function addBadgeAfterName(nameElement) {
+    if (!nameElement || nameElement.parentElement?.querySelector('.admin-owner-badge')) return;
+    nameElement.after(badge());
   }
 
   function apply(profile) {
     if (!profile) return;
-    const header = document.querySelector('#header-profile');
-    if (header && !header.querySelector('.admin-owner-badge')) header.appendChild(badge());
+    const adminName = profile.display_name?.trim();
+    if (!adminName) return;
 
-    const profileLink = document.querySelector('#profile-link');
-    if (profileLink && !profileLink.querySelector('.admin-nav-crown')) {
-      const crown = document.createElement('span');
-      crown.className = 'admin-nav-crown';
-      crown.textContent = '♛';
-      crown.title = '管理者';
-      profileLink.appendChild(crown);
-    }
+    // 投稿・コメント・スレッド詳細に表示される管理者本人の名前だけに ADMIN タグを付与
+    document.querySelectorAll('.thread-author span, .detail-author strong, .comment-author strong').forEach(el => {
+      if (el.textContent.trim() === adminName) addBadgeAfterName(el);
+    });
 
+    // 管理画面の自分の行にも表示
     document.querySelectorAll('.admin-user').forEach(row => {
-      if (row.querySelector('.muted')?.textContent?.trim() === '自分' && !row.querySelector('.admin-owner-badge')) {
-        row.querySelector('strong')?.after(badge());
-      }
+      const strong = row.querySelector('strong');
+      if (strong?.textContent.trim() === adminName) addBadgeAfterName(strong);
     });
   }
 
